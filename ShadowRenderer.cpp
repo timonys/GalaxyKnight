@@ -21,7 +21,7 @@ void ShadowMapRenderer::Initialize(const GameContext& gameContext)
 
 	UNREFERENCED_PARAMETER(gameContext);
 	//create shadow generator material + initialize it
-	//create a rendertarget with the correct settings (hint: depth only) for the shadow generator using a RENDERTARGET_DESC
+	//create a rendertarget with the correct settings (depth only) for the shadow generator using a RENDERTARGET_DESC
 
 	m_pShadowMat = new ShadowMapMaterial();
 	m_pShadowMat->Initialize(gameContext);
