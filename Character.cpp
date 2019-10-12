@@ -52,16 +52,16 @@ GameCharacter::GameCharacter(float xPos, float yPos, float zPos,float radius, fl
 void GameCharacter::Initialize(const GameContext& gameContext)
 {
 	UNREFERENCED_PARAMETER(gameContext);
-	auto physX = PhysxManager::GetInstance()->GetPhysics();
-
-	auto noBouncy = physX->createMaterial(1.f, 1.f, 0.f);
-	//TODO: Create controller
-	m_pController = new ControllerComponent(noBouncy, m_Radius, m_Height, L"Player", physx::PxCapsuleClimbingMode::eEASY);
-	//m_pController->SetCollisionGroup(CollisionGroupFlag::Group0);
-	AddComponent(m_pController);
 	
+	auto physX = PhysxManager::GetInstance()->GetPhysics();
+	auto noBouncy = physX->createMaterial(1.f, 1.f, 0.f);
+	
+	//Create controller
+	m_pController = new ControllerComponent(noBouncy, m_Radius, m_Height, L"Player", physx::PxCapsuleClimbingMode::eEASY);
+	AddComponent(m_pController);
 	m_pController->SetCollisionIgnoreGroups(CollisionGroupFlag::Group7);
-
+	
+	//Create and place the player model + set player material settings
 	m_pPlayerModelHolder = new GameObject();
 	auto playerModel = new ModelComponent(L"Resources/Meshes/Knight_Game_2.ovm");
 	m_pPlayerModelHolder->AddComponent(playerModel);
@@ -77,6 +77,7 @@ void GameCharacter::Initialize(const GameContext& gameContext)
 	m_pPlayerModelHolder->GetTransform()->Rotate(0.0f, 180.0f, 0.0f);
 	m_LastAngle = 180.0f;
 	
+	//create a camera and set start transform
 	m_pCameraObject = new GameObject();
 	auto cam = new CameraComponent();
 	m_pCameraObject->AddComponent(cam);
@@ -84,8 +85,10 @@ void GameCharacter::Initialize(const GameContext& gameContext)
 	m_pCameraObject->GetTransform()->Rotate(35.0f, 0.0f, 0.0f);
 	
 	AddChild(m_pCameraObject);
-	//UI
-
+	cam->SetActive();
+	
+	//--UI--
+	//Load a font
 	m_pFont = ContentManager::Load<SpriteFont>(L"./Resources/SpriteFonts/GillSans_64_nr.fnt");
 
 	//Load in all health textures
@@ -95,7 +98,7 @@ void GameCharacter::Initialize(const GameContext& gameContext)
 		m_pHealthTextures.push_back(healthTexture);
 	}
 	
-
+	//Place the health UI
 	GameSettings gameSettings = OverlordGame::GetGameSettings();
 	float xPos = gameSettings.Window.Width - 200.0f;
 	float yPos = gameSettings.Window.Height - 600.0f;
@@ -109,8 +112,7 @@ void GameCharacter::Initialize(const GameContext& gameContext)
 	m_pHealthContainer->GetTransform()->Translate(xPos, yPos, .99f);
 	m_pHealthContainer->GetTransform()->Scale(0.55f, 0.55f, 1.0f);
 
-	//star ui
-
+	//star ui placement
 	m_pStarCoinContainer = new GameObject();
 
 	m_pStarCoinSprite = new SpriteComponent(L"Resources/Textures/staircoinUI.png", DirectX::XMFLOAT2(0.5f, 0.5f), DirectX::XMFLOAT4(1, 1, 1, 1.0f));
@@ -125,16 +127,16 @@ void GameCharacter::Initialize(const GameContext& gameContext)
 	m_CurrentHealth = m_MaxHealth;
 	
 
-	//TODO: Register all Input Actions
+	//Register all Input Actions
 	gameContext.pInput->AddInputAction(InputAction(LEFT, Down, 'A'));
 	gameContext.pInput->AddInputAction(InputAction(RIGHT, Down, 'D'));
 	gameContext.pInput->AddInputAction(InputAction(FORWARD, Down, 'W'));
 	gameContext.pInput->AddInputAction(InputAction(BACKWARD, Down, 'S'));
 	gameContext.pInput->AddInputAction(InputAction(JUMP, Down, VK_SPACE,-1,XINPUT_GAMEPAD_A));
-	cam->SetActive();
+	
 	m_Invulnerable = true;
 
-	//run particles
+	//Initialize run particles
 	m_pEmitter = new GameObject();
 	m_pParticleEmitter = new ParticleEmitterComponent(L"./Resources/Textures/RunParticle.png", 16);
 	m_pParticleEmitter->SetVelocity(DirectX::XMFLOAT3(0, 0.5f, 0));
@@ -151,13 +153,13 @@ void GameCharacter::Initialize(const GameContext& gameContext)
 	AddChild(m_pEmitter);
 	m_pEmitter->GetTransform()->Translate(0.0f, -3.0f, 0.0f);
 	m_pEmitter->SetEnabled(false);
-	//m_pController->SetCollisionIgnoreGroups(CollisionGroupFlag::Group9);
+	
 
-	m_pEmitter->SetEnabled(false);
-
+	//Create player sounds
 	SoundManager::GetInstance()->GetSystem()->createSound("Resources/Sounds/jump.wav", FMOD_2D , NULL, &m_pJumpSound);
 	SoundManager::GetInstance()->GetSystem()->createSound("Resources/Sounds/hurt.wav", FMOD_2D, NULL, &m_pHurtSound);
 	
+	//Set player start position
 	GetTransform()->Translate(m_xOffset, m_yOffset, m_zOffset);
 
 	m_IsInit = true;
@@ -166,6 +168,7 @@ void GameCharacter::Initialize(const GameContext& gameContext)
 void GameCharacter::PostInitialize(const GameContext& gameContext)
 {
 	UNREFERENCED_PARAMETER(gameContext);
+	//set start animation(IDLE)
 	m_pAnimator = m_pPlayerModelHolder->GetComponent<ModelComponent>()->GetAnimator();
 	if (m_pAnimator) 
 	{
@@ -177,6 +180,7 @@ void GameCharacter::PostInitialize(const GameContext& gameContext)
 
 void GameCharacter::UpdateGrounded()
 {
+	//Check if character is on the ground
 	physx::PxRaycastBuffer hitInfo;
 	physx::PxVec3 start = ToPxVec3(m_pController->GetFootPosition());
 	physx::PxVec3 dir = ToPxVec3(m_pController->GetUp());
@@ -187,12 +191,12 @@ void GameCharacter::UpdateGrounded()
 
 void GameCharacter::UpdateUp()
 {
+	//Update characters up vector based on surface normals -> later used to calculate gravity
 	physx::PxRaycastBuffer hitInfo;
 	physx::PxVec3 start = ToPxVec3(m_pController->GetFootPosition());
 	physx::PxVec3 dir = ToPxVec3(m_pController->GetUp());
 	physx::PxQueryFilterData filter;
 	filter.data.word0 = CollisionGroupFlag::Group4;
-//	filter.data.word1 = CollisionGroupFlag::Group6;
 
 	auto physxProxy = GetScene()->GetPhysxProxy();
 	bool hit = physxProxy->Raycast(start, -dir, m_DownRaycastLength, hitInfo, physx::PxHitFlag::eDEFAULT, filter);
@@ -234,7 +238,6 @@ void GameCharacter::Update(const GameContext& gameContext)
 
 	// If not done with initializing then just return
 	GameprojectScene* scene = static_cast<GameprojectScene*>(GetScene());
-	
 	if (!m_IsInit || !scene) return;
 
 
@@ -253,7 +256,7 @@ void GameCharacter::Update(const GameContext& gameContext)
 		Hit();
 	}
 
-
+	//Display running particles only when running
 	if (m_PlayerState == RUNNING)
 	{
 		m_pEmitter->SetEnabled(true);
@@ -291,33 +294,41 @@ void GameCharacter::Update(const GameContext& gameContext)
 		}
 	}
 
-	// Updating the up vector based on polygon below through raycast
+	
 	UpdateUp();
+	//Set updated up as character up -> further optimize! only update if change is needed?
 	m_pController->SetUpVector(m_Up.getNormalized());
 
+	//Potentially dangerous -> Have a decent state manager or game manager
 	if (m_PlayerState != DYING && m_PlayerState != VICTORIOUS) {
-		// Calculating the nw local axes taking spherical gravity and up of the surface into account
+		// Calculating the new local axes taking spherical gravity and up of the surface into account
+		
+		//Forward of the world
 		XMVECTOR globalForward = { 1, 0, 0 };
 		XMFLOAT3 fup = m_pController->GetUp();
 		
 		XMVECTOR localUp = XMLoadFloat3(&fup);
 		XMVECTOR localRight = XMLoadFloat3(&GetTransform()->GetRight());
 		XMVECTOR localForward = XMLoadFloat3(&GetTransform()->GetForward());
+		
+		//new forward,up and right vectors
 		localUp = XMVector3Normalize(localUp);
 		localRight = XMVector3Normalize(localRight);
 		localForward = XMVector3Normalize(localForward);
 
 		//MOVEMENT
 		if (!scene->IsShowingControls()) {
-			// Move direction based on input
+			//forward / backward movement
 			m_MoveDirection.z = gameContext.pInput->IsActionTriggered(FORWARD) ? 1.0f : 0.0f;
 			if (m_MoveDirection.z == 0) m_MoveDirection.z = -(gameContext.pInput->IsActionTriggered(BACKWARD) ? 1.0f : 0.0f);
 			if (m_MoveDirection.z == 0) m_MoveDirection.z = gameContext.pInput->GetThumbstickPosition().y;
+			
+			//right/left movement
 			m_MoveDirection.x = gameContext.pInput->IsActionTriggered(RIGHT) ? 1.0f : 0.0f;
 			if (m_MoveDirection.x == 0) m_MoveDirection.x = -(gameContext.pInput->IsActionTriggered(LEFT) ? 1.0f : 0.0f);
 			if (m_MoveDirection.x == 0) m_MoveDirection.x = gameContext.pInput->GetThumbstickPosition().x;
 
-			std::cout << m_MoveDirection.x << " " << m_MoveDirection.y << " " << m_MoveDirection.z << std::endl;
+			//movement angle for rotations of the player model
 			float angle = atan2f(m_MoveDirection.z, m_MoveDirection.x);
 			angle = XMConvertToDegrees(angle);
 			angle += 90.0f;
@@ -330,16 +341,18 @@ void GameCharacter::Update(const GameContext& gameContext)
 				angle = LerpFloat(m_LastAngle, angle, gameContext.pGameTime->GetElapsed() * 10.5f);
 				
 			}
+			//Have to rotate model independantly from character controller
 			m_pPlayerModelHolder->GetTransform()->Rotate(0.0f, -angle, 0.0f);
 			m_LastAngle = angle;
-			// Multilying by movement speed (we dont care about upwards movement yet)
+			
+			// Multiplying by movement speed (we dont care about upwards movement yet)
 			m_MoveDirection.x *= m_MoveSpeed;
 			m_MoveDirection.z *= m_MoveSpeed;
 		}
 
 		
 
-		// Add jump velocity if space is pessed and the GameCharacter is grounded
+		// Add jump velocity on jumping if the GameCharacter is not already jumping
 		if (gameContext.pInput->IsActionTriggered(JUMP) && m_IsGrounded)
 		{
 			m_MoveDirection.y = m_JumpSpeed;
@@ -355,9 +368,9 @@ void GameCharacter::Update(const GameContext& gameContext)
 		// Apply gravitational force
 		m_MoveDirection.y -= m_Gravity * gameContext.pGameTime->GetElapsed();
 
+		//change movement states depending on movement
 		if ((m_MoveDirection.x != 0.0f || m_MoveDirection.z != 0.0f) && m_IsGrounded)
 		{
-			//m_LastPlayerState = m_PlayerState;
 			m_PlayerState = RUNNING;
 		}
 		else if (m_MoveDirection.y > 0.0f)
@@ -365,13 +378,13 @@ void GameCharacter::Update(const GameContext& gameContext)
 			m_PlayerState = JUMPING;
 		}
 
-		// Load the moveDirection in XMVECTOR
+		
 		XMVECTOR moveDir = XMLoadFloat3(&m_MoveDirection);
 		// Apply the correct directions to movement based on directional vectors of GameCharacter controller
 		XMVECTOR move = XMVectorGetByIndex(moveDir, 0) * localRight + XMVectorGetByIndex(moveDir, 2) * localForward + XMVectorGetByIndex(moveDir, 1) * localUp;
 
 
-		// Storing the XMVECTOR
+		// Storing the movement
 		move *= gameContext.pGameTime->GetElapsed();
 		XMFLOAT3 movement{};
 		XMStoreFloat3(&movement, move);
@@ -382,6 +395,8 @@ void GameCharacter::Update(const GameContext& gameContext)
 		//End movement
 
 	}
+	
+	//Check if player is hit when vulnurable
 	if (m_Hit && !m_Invulnerable && m_PlayerState != DYING && !scene->IsShowingControls() && m_PlayerState != VICTORIOUS)
 	{
 		HandleHit();
@@ -391,6 +406,7 @@ void GameCharacter::Update(const GameContext& gameContext)
 	UpdateRotation(gameContext.pGameTime->GetElapsed(), m_MoveDirection);
 
 
+	//Update the scaling of the player UI depending on health
 	if (m_CurrentHealth > 2 || m_CurrentHealth == 0 )
 	{
 		m_pHealthContainer->GetTransform()->Scale(0.55f, 0.55f, 1.0f);
@@ -416,9 +432,11 @@ void GameCharacter::Update(const GameContext& gameContext)
 void GameCharacter::Draw(const GameContext & gameContext)
 {
 	UNREFERENCED_PARAMETER(gameContext);
+	
 	auto scene = static_cast<GameprojectScene*>(GetScene());
 	if (scene->IsShowingControls() || scene->GameDone()) return;
 	
+	//Draw UI
 	if (m_pFont->GetFontName() != L"" && m_CurrentHealth > 0)
 	{
 		
@@ -434,6 +452,7 @@ void GameCharacter::Draw(const GameContext & gameContext)
 
 void GameCharacter::HandleHit()
 {
+	//Player feedback when hit + update stats
 	m_ProcessingHit = true;
 	Blood* blood = new Blood(GetTransform()->GetPosition());
 	GetScene()->AddChild(blood);
@@ -452,6 +471,7 @@ void GameCharacter::AddStarScore(int value)
 
 void GameCharacter::Reset()
 {
+	//Reset the character to initial form
 	GetTransform()->Translate(m_xOffset, m_yOffset, m_zOffset);
 	m_pPlayerModelHolder->GetTransform()->Rotate(0.0f, 180.0f, 0.0f);
 	m_ProcessingHit = false;
