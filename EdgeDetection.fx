@@ -73,6 +73,7 @@ float4 PS(PS_INPUT input): SV_Target
 	
 	float2 uv = input.TexCoord;
 
+	//sample 8 pixels around the current pixel
 	float3 TopLeft = gTexture.Sample(samPoint, uv + float2(-1, -1) / res);
 	float3 TopMiddle = gTexture.Sample(samPoint, uv + float2(0, -1) / res);
 	float3 TopRight = gTexture.Sample(samPoint, uv + float2(1, -1) / res);
@@ -84,8 +85,10 @@ float4 PS(PS_INPUT input): SV_Target
 	float3 BottomMiddle = gTexture.Sample(samPoint, uv + float2(0, 1) / res);
 	float3 BottomRight = gTexture.Sample(samPoint, uv + float2(1, 1) / res);
 
+	//Apply sobel filter
 	float x = TopLeft + 2.0 * MiddleLeft + BottomLeft - TopRight - 2.0 * MiddleRight - BottomRight;
 	float y = -TopLeft - 2.0 * TopMiddle - TopRight + BottomLeft + 2.0 * BottomMiddle + BottomRight;
+	
 	float edgeIntensity = sqrt((x * x) + (y * y));
 
 	float4 color = gTexture.Sample(samPoint, input.TexCoord);
